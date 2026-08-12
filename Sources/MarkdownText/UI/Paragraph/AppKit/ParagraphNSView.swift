@@ -187,6 +187,8 @@ class ParagraphNSView: NSTextView {
     }
 
     isEditable = false
+    // Driven by `MarkdownRenderConfig.textSelectionConfig.isEnabled` via
+    // `setSelectable(_:)`; setup runs before the config is applied.
     isSelectable = true
     drawsBackground = false
     textContainer?.lineFragmentPadding = 0
@@ -308,6 +310,14 @@ class ParagraphNSView: NSTextView {
 
   private func invalidateCachedSize() {
     cachedSize = nil
+  }
+
+  /// Mirrors `MarkdownRenderConfig.textSelectionConfig.isEnabled` onto the text
+  /// view, so a host that disables selection gets a paragraph that does not
+  /// claim the gestures selection needs.
+  func setSelectable(_ selectable: Bool) {
+    guard isSelectable != selectable else { return }
+    isSelectable = selectable
   }
 
   func setTextContextMenu(_ menu: TextContextMenu?) {

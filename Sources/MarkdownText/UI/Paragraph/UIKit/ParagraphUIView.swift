@@ -176,6 +176,8 @@ class ParagraphUIView: UITextView {
     }
 
     isEditable = false
+    // Driven by `MarkdownRenderConfig.textSelectionConfig.isEnabled` via
+    // `setSelectable(_:)`; `setupView()` runs before the config is applied.
     isSelectable = true
     isScrollEnabled = false
     textAlignment = .left
@@ -332,6 +334,16 @@ class ParagraphUIView: UITextView {
 
   func setTextContextMenu(_ menu: TextContextMenu?) {
     textContextMenu = menu
+  }
+
+  /// Mirrors `MarkdownRenderConfig.textSelectionConfig.isEnabled` onto the text
+  /// view. A host that disables text selection expects the paragraph to stop
+  /// intercepting the touches selection needs — in particular the long press,
+  /// which a selectable `UITextView` claims before any SwiftUI `.contextMenu`
+  /// on an ancestor can see it.
+  func setSelectable(_ selectable: Bool) {
+    guard isSelectable != selectable else { return }
+    isSelectable = selectable
   }
 
   func setMarkdownController(_ controller: MarkdownController?) {
