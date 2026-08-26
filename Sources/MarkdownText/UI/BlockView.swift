@@ -39,11 +39,11 @@ struct SingleBlockView: View {
     Group {
       switch renderable {
       case .heading(_, _, let contents):
-        ParagraphView(contents: contents)
+        ParagraphBlockView(contents: contents)
           .transition(.opacity)
           .accessibilityAddTraits(.isHeader)
       case .paragraph(_, let contents):
-        ParagraphView(contents: contents, lineSpacing: 5)
+        ParagraphBlockView(contents: contents, lineSpacing: 5)
           .fixedSize(horizontal: false, vertical: true)
           .transition(.opacity)
       case .latex(_, let latexString):
