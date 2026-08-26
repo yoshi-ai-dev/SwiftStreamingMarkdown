@@ -62,7 +62,7 @@ final class ParagraphBlockViewTests: XCTestCase {
   }
 
   func test_needsTextViewLayout_isFalseForPlainProse() {
-    XCTAssertFalse(NSAttributedString(string: "hello").needsTextViewLayout)
+    XCTAssertFalse(ParagraphBlockView.needsTextViewLayout(NSAttributedString(string: "hello")))
   }
 
   /// Inline code is a `.backgroundColor` run, and `Text` fills it over the full
@@ -75,7 +75,7 @@ final class ParagraphBlockViewTests: XCTestCase {
       return XCTFail("Expected a single paragraph")
     }
 
-    XCTAssertTrue(contents.needsTextViewLayout)
+    XCTAssertTrue(ParagraphBlockView.needsTextViewLayout(contents))
     XCTAssertNil(ParagraphBlockView.plainText(for: contents, config: plainTextConfig))
   }
 
@@ -85,8 +85,13 @@ final class ParagraphBlockViewTests: XCTestCase {
   /// path would be a silent restyle rather than the same paragraph drawn
   /// cheaper. Fonts and colors arrive as UIKit/AppKit attributes, which
   /// `AttributedString` carries in its platform scope.
+  ///
+  /// Asserted per *run* rather than "some run has a font": a paragraph where
+  /// every run came out in the body face and the body ink is exactly the silent
+  /// restyle this test exists to catch, and it would satisfy any weaker check.
   func test_plainText_preservesLinkAndInlineStyling() async throws {
-    let document = await parser.parse(text: "**bold** and [docs](https://example.com)")
+    let inlineStyle = plainTextConfig.inlineStyle
+    let document = await parser.parse(text: "plain **bold** and [docs](https://example.com)")
     let renderables = document.convert(with: plainTextConfig)
     guard case .paragraph(_, let contents) = renderables.first else {
       return XCTFail("Expected a single paragraph")
@@ -94,19 +99,34 @@ final class ParagraphBlockViewTests: XCTestCase {
 
     let plainText = try XCTUnwrap(ParagraphBlockView.plainText(for: contents, config: plainTextConfig))
 
-    XCTAssertEqual(String(plainText.characters), "bold and docs")
+    XCTAssertEqual(String(plainText.characters), "plain bold and docs")
 
-    let link = plainText.runs.compactMap { $0.link }.first
-    XCTAssertEqual(link, URL(string: "https://example.com"))
+    func run(containing substring: String) throws -> AttributedString.Runs.Element {
+      let range = try XCTUnwrap(plainText.range(of: substring), "No run contains \(substring)")
+      return try XCTUnwrap(plainText.runs.first { $0.range.overlaps(range) })
+    }
+
+    let plainRun = try run(containing: "plain")
+    let boldRun = try run(containing: "bold")
+    let linkRun = try run(containing: "docs")
+
+    XCTAssertEqual(linkRun.link, URL(string: "https://example.com"))
 
     #if canImport(UIKit)
-    let fonts = plainText.runs.compactMap { $0.uiKit.font }
-    let colors = plainText.runs.compactMap { $0.uiKit.foregroundColor }
+    let plainFont = plainRun.uiKit.font
+    let boldFont = boldRun.uiKit.font
+    let linkColor = linkRun.uiKit.foregroundColor
+    let plainColor = plainRun.uiKit.foregroundColor
     #elseif canImport(AppKit)
-    let fonts = plainText.runs.compactMap { $0.appKit.font }
-    let colors = plainText.runs.compactMap { $0.appKit.foregroundColor }
+    let plainFont = plainRun.appKit.font
+    let boldFont = boldRun.appKit.font
+    let linkColor = linkRun.appKit.foregroundColor
+    let plainColor = plainRun.appKit.foregroundColor
     #endif
-    XCTAssertFalse(fonts.isEmpty, "Expected the converted runs to carry the configured faces")
-    XCTAssertFalse(colors.isEmpty, "Expected the converted runs to carry the configured colors")
+
+    XCTAssertNotNil(plainFont, "Expected the body run to carry the configured face")
+    XCTAssertNotEqual(boldFont, plainFont, "Expected the bold run to differ from the body face")
+    XCTAssertEqual(linkColor, MDColor(inlineStyle.linkTextColor), "Expected the link run in the configured link color")
+    XCTAssertNotEqual(linkColor, plainColor, "Expected the link run to differ from the body ink")
   }
 }

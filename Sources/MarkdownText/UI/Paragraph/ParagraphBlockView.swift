@@ -33,16 +33,28 @@ import SwiftUI
 ///    hugs the glyphs. That is a visible difference on the one construct that
 ///    uses it, so a paragraph containing inline code keeps the text view.
 ///
-/// Table cells deliberately keep using `ParagraphView` directly: GFM column
-/// alignment rides on an `NSParagraphStyle`, which `Text` ignores.
+/// `Text` ignores `NSParagraphStyle` entirely, and two things ride on it:
 ///
-/// **The one thing that is not identical** is line breaking. SwiftUI `Text`
-/// balances a short wrapped block — it will push a word to the second line to
-/// even the two lines out — where TextKit fills the first line greedily. There
-/// is no API to turn that off (it is not an `NSParagraphStyle` property `Text`
-/// reads; that was tried), so a two-line paragraph or list item can break one
-/// word earlier than it did through the text view. `ParagraphBlockViewSnapshotTests`
-/// records both paths over the same document so the difference stays visible.
+///  * **GFM column alignment**, which is why table cells keep calling
+///    `ParagraphView` directly rather than coming through here.
+///  * **`alignment = .left`**, which the text view hardcodes
+///    (`ParagraphUIView.applyLineSpacing`). `Text` follows
+///    `.multilineTextAlignment`, whose default `.leading` resolves to *trailing*
+///    in an RTL locale. So the two paths disagree there — and `Text` is the one
+///    that is right, since a paragraph of Arabic prose left-aligned in a
+///    right-to-left layout is a bug the text view has today.
+///
+/// The line spacing also rides on that paragraph style, which is why it is
+/// applied as a modifier here instead.
+///
+/// **The one difference that is not an improvement** is line breaking. SwiftUI
+/// `Text` balances a short wrapped block — it will push a word to the second
+/// line to even the two lines out — where TextKit fills the first line greedily.
+/// There is no API to turn that off (it is not an `NSParagraphStyle` property
+/// `Text` reads; that was tried), so a two-line paragraph or list item can break
+/// one word earlier than it did through the text view.
+/// `ParagraphBlockViewSnapshotTests` records both paths over one document, and
+/// its docstring carries the measured size of the difference.
 struct ParagraphBlockView: View {
 
   @Environment(\.markdownConfig) var config: MarkdownRenderConfig
@@ -70,20 +82,34 @@ struct ParagraphBlockView: View {
   /// The line spacing is deliberately *not* baked in here: it arrives as an
   /// `NSParagraphStyle` in the text-view path, which `Text` ignores, so it is
   /// applied as a modifier instead.
+  ///
+  /// **This runs in `body`, and what that costs was measured rather than
+  /// assumed** (iPhone 17 Pro simulator, 2000 iterations): a 100-character
+  /// paragraph — the size a chat reply is made of — is 2.8µs of attribute scan
+  /// plus 35µs of `AttributedString` bridging; a 700-character one is 40µs plus
+  /// 162µs. Against the ~16.7ms frame it is per-realization noise, and it is
+  /// what replaced building and laying out a text view. The animating config
+  /// costs 0.02µs, because `shouldAnimateText` is checked before the string is
+  /// touched at all — so the bubble a reply streams into, which re-evaluates
+  /// once per token, never pays the scan.
+  ///
+  /// The cheaper shape, if this ever shows up in a trace: decide the path and
+  /// build the value once in `RenderableDocument(document:config:)`, which is
+  /// already `async` and already holds the config, and carry it on the
+  /// renderable. That takes the work off the render path entirely — at the cost
+  /// of widening `MarkdownRenderable`, which every block view pattern-matches.
   nonisolated static func plainText(
     for contents: NSAttributedString,
     config: MarkdownRenderConfig
   ) -> AttributedString? {
     guard !config.textSelectionConfig.isEnabled,
           !config.shouldAnimateText,
-          !contents.needsTextViewLayout else {
+          !needsTextViewLayout(contents) else {
       return nil
     }
     return AttributedString(contents)
   }
-}
 
-extension NSAttributedString {
   /// Whether any run carries an attribute SwiftUI `Text` cannot reproduce
   /// faithfully:
   ///
@@ -92,10 +118,15 @@ extension NSAttributedString {
   ///  * `.backgroundColor` — the fill behind inline code, which `Text` draws
   ///    over the full line height and out to the end of a wrapped line rather
   ///    than around the glyphs.
-  var needsTextViewLayout: Bool {
+  ///
+  /// Deliberately a member here rather than an extension on `NSAttributedString`:
+  /// it is this view's rule about its own two paths, not a general property of
+  /// attributed strings, and a general-sounding name on a Foundation type is how
+  /// a local rule gets adopted somewhere it does not hold.
+  nonisolated static func needsTextViewLayout(_ contents: NSAttributedString) -> Bool {
     var found = false
-    let fullRange = NSRange(location: 0, length: length)
-    enumerateAttributes(in: fullRange, options: []) { attributes, _, stop in
+    let fullRange = NSRange(location: 0, length: contents.length)
+    contents.enumerateAttributes(in: fullRange, options: []) { attributes, _, stop in
       if attributes[.attachment] != nil || attributes[.backgroundColor] != nil {
         found = true
         stop.pointee = true
