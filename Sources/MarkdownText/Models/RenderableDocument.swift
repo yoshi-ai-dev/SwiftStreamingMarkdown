@@ -18,6 +18,10 @@ import AppKit
 public struct RenderableDocument: Equatable, Sendable {
   let renderables: [MarkdownRenderable]
 
+  /// Whether the converted blocks contain non-whitespace text. Image descriptions
+  /// and decorative rules do not qualify. This does not confirm view presentation.
+  public let hasReadableText: Bool
+
   var containsCodeBlock: Bool {
     return renderables.contains(where: { $0.isCodeBlock })
   }
@@ -35,7 +39,7 @@ public struct RenderableDocument: Equatable, Sendable {
   ///   - document: The parsed markdown tree.
   ///   - config: Styling and behavior used during conversion.
   public init(document: Markdown.Document, config: MarkdownRenderConfig) async {
-    self.renderables = document.convert(with: config)
+    self.init(renderables: document.convert(with: config))
   }
 
   /// Construct a renderable wrapping a single plain-text paragraph styled
@@ -55,11 +59,25 @@ public struct RenderableDocument: Equatable, Sendable {
 
   init(renderables: [MarkdownRenderable]) {
     self.renderables = renderables
+    self.hasReadableText = renderables.contains(where: \.hasReadableText)
   }
 
   /// An empty document, equivalent to `RenderableDocument(plainText: "", …)`
   /// but allocation-free.
   public static let empty = RenderableDocument(renderables: [])
+}
+
+private extension MarkdownRenderable {
+  var hasReadableText: Bool {
+    switch self {
+    case .image, .thematicBreak:
+      return false
+    case .orderedList(_, let items), .unorderedList(_, let items, _):
+      return items.contains { $0.children.contains(where: \.hasReadableText) }
+    default:
+      return !(plainText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+  }
 }
 
 extension RenderableDocument {
