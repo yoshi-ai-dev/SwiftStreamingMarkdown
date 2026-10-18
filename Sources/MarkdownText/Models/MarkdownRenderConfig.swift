@@ -126,8 +126,20 @@ public struct MarkdownRenderConfig: Hashable, Sendable {
 
   /// Styling for inline runs: bold emphasis, links, and inline code spans.
   public struct MarkdownInlineTextStyle: Hashable, Sendable {
+    /// Which bold-emphasis runs take `boldTextColor`.
+    public enum BoldTextColorScope: Hashable, Sendable {
+      /// Only a bold run that opens a list item (the default, and upstream's
+      /// behavior). Bold elsewhere keeps the surrounding text's color.
+      case listItemLeadIn
+      /// Every bold run, for a host whose bold face is no heavier than its
+      /// body face and so marks emphasis by color.
+      case everywhere
+    }
+
     /// Foreground color applied to bold-emphasis runs.
     public let boldTextColor: Color
+    /// Which bold runs `boldTextColor` applies to.
+    public let boldTextColorScope: BoldTextColorScope
     /// Font used for link runs.
     public let linkTextFont: MDFont
     /// Foreground color applied to link runs.
@@ -158,8 +170,9 @@ public struct MarkdownRenderConfig: Hashable, Sendable {
     }
 
     /// Create an inline text style with the supplied fonts, color palette, and link underline style.
-    public init(boldTextColor: Color, linkTextFont: MDFont, linkTextColor: Color, linkUnderlineStyle: NSUnderlineStyle, codeTextFont: MDFont, codeTextColor: Color, codeBackgroundColor: Color, codeUnderlineColor: Color) {
+    public init(boldTextColor: Color, boldTextColorScope: BoldTextColorScope = .listItemLeadIn, linkTextFont: MDFont, linkTextColor: Color, linkUnderlineStyle: NSUnderlineStyle, codeTextFont: MDFont, codeTextColor: Color, codeBackgroundColor: Color, codeUnderlineColor: Color) {
       self.boldTextColor = boldTextColor
+      self.boldTextColorScope = boldTextColorScope
       self.linkTextFont = linkTextFont
       self.linkTextColor = linkTextColor
       self.linkUnderlineStyle = linkUnderlineStyle
