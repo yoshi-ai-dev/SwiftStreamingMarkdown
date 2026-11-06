@@ -27,6 +27,9 @@ struct CodeBlockView: View {
   }
 
   private func updateAttributedString(code: String, scheme: ColorScheme) async {
+    // Highlighting converts HTML into an attributed string off the main thread,
+    // which can deadlock against it; a host that turns it off never starts it.
+    guard config.codeBlockConfig.highlightsSyntax else { return }
     let colors = config.codeBlockConfig.theme.highlightColors(for: scheme)
     await taskManager.enqueueCode(code, colors: colors) { newAttributedString in
       self.attributedString = newAttributedString

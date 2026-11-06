@@ -45,7 +45,9 @@ extension Markdown.Strong: InlineConvertible {
     } else {
       newContainer[.font] = config.paragraphStyle.textFonts.bold ?? config.paragraphStyle.textFonts.normal
     }
-    if self.parent is Paragraph && self.indexInParent == 0 && self.parent?.parent is ListItem && parent?.indexInParent == 0 {
+    let opensListItem = self.parent is Paragraph && self.indexInParent == 0
+      && self.parent?.parent is ListItem && parent?.indexInParent == 0
+    if config.inlineStyle.boldTextColorScope == .everywhere || opensListItem {
       newContainer[.foregroundColor] = MDColor(config.inlineStyle.boldTextColor)
     }
     self.inlineConvertibleChildren.forEach { convertible in
