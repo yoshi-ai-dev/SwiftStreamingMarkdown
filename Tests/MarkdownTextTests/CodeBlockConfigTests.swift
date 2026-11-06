@@ -41,6 +41,17 @@ final class CodeBlockConfigTests: XCTestCase {
     XCTAssertEqual(config.chromeTextFonts, Typography.smallTextFonts)
   }
 
+  func testSyntaxHighlightingIsOnUnlessTheHostTurnsItOff() {
+    XCTAssertTrue(CodeBlockConfig.default.highlightsSyntax)
+    XCTAssertTrue(CodeBlockConfig(theme: .xcode).highlightsSyntax)
+    XCTAssertTrue(CodeBlockConfig(codeTextFonts: nil, chromeTextFonts: nil).highlightsSyntax)
+
+    let plain = CodeBlockConfig(codeTextFonts: nil, chromeTextFonts: nil, highlightsSyntax: false)
+
+    XCTAssertFalse(plain.highlightsSyntax)
+    XCTAssertNotEqual(plain, CodeBlockConfig(codeTextFonts: nil, chromeTextFonts: nil))
+  }
+
   private func textFonts(size: CGFloat) -> TextFonts {
     TextFonts(
       normal: MDFont.systemFont(ofSize: size),

@@ -81,6 +81,13 @@ public struct CodeBlockConfig: Hashable, Sendable {
   /// bundled small-text fonts.
   public let chromeTextFonts: TextFonts
 
+  /// Whether code is syntax-highlighted. `false` shows the code as plain text
+  /// in `codeTextFonts` and never starts a highlight: HighlightSwift converts
+  /// highlight.js's HTML with `NSAttributedString`'s HTML importer off the
+  /// main thread, which synchronizes with the main thread and can deadlock it
+  /// when several blocks highlight at once. Defaults to `true`.
+  public let highlightsSyntax: Bool
+
   /// Create a code-block configuration.
   /// - Parameters:
   ///   - theme: See `theme`. Defaults to `Theme.default`.
@@ -96,7 +103,8 @@ public struct CodeBlockConfig: Hashable, Sendable {
       backgroundColor: backgroundColor,
       foregroundColor: foregroundColor,
       codeTextFonts: nil,
-      chromeTextFonts: nil
+      chromeTextFonts: nil,
+      highlightsSyntax: true
     )
   }
 
@@ -107,13 +115,16 @@ public struct CodeBlockConfig: Hashable, Sendable {
   ///   - foregroundColor: See `foregroundColor`. Defaults to `nil` (`Stone350`).
   ///   - codeTextFonts: See `codeTextFonts`. Pass `nil` for bundled defaults.
   ///   - chromeTextFonts: See `chromeTextFonts`. Pass `nil` for bundled defaults.
+  ///   - highlightsSyntax: See `highlightsSyntax`. Defaults to `true`.
   public init(
     theme: Theme = .default,
     backgroundColor: Color? = nil,
     foregroundColor: Color? = nil,
     codeTextFonts: TextFonts?,
-    chromeTextFonts: TextFonts?
+    chromeTextFonts: TextFonts?,
+    highlightsSyntax: Bool = true
   ) {
+    self.highlightsSyntax = highlightsSyntax
     self.theme = theme
     self.backgroundColor = backgroundColor
     self.foregroundColor = foregroundColor
