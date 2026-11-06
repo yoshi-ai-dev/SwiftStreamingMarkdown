@@ -33,10 +33,15 @@ extension Markdown.Table: BlockConvertible {
       }
     // swift-markdown's MarkupFormatter.visitTable crashes with an array index
     // out of bounds when any body row has fewer columns than the header
-    // (https://github.com/swiftlang/swift-markdown/issues/238).
-    // Guard against this by only calling format() when the table is well-formed.
+    // (https://github.com/swiftlang/swift-markdown/issues/238), and when a
+    // cell's column span runs past the last column: the parser reads table
+    // spans, so a row ending in `||` gives its last cell a span of 2 while the
+    // row keeps the header's cell count. Guard against both by only calling
+    // format() when the table is well-formed and no cell spans columns.
     let headerColumnCount = self.head.childCount
     let isWellFormed = self.body.children.allSatisfy { $0.childCount == headerColumnCount }
+      && self.head.cells.allSatisfy { $0.colspan == 1 }
+      && self.body.rows.allSatisfy { row in row.cells.allSatisfy { $0.colspan == 1 } }
     let rawMarkdown = isWellFormed ? self.format() : ""
     let alignments = (0..<headerCells.count).map { index -> MarkdownColumnAlignment in
       guard index < self.columnAlignments.count else { return .leading }
